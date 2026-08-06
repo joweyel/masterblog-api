@@ -5,6 +5,8 @@ build/
 dist/
 wheels/
 *.egg-info
+masterblog-api.zip
+.env
 
 # Virtual environments
 .venv
