@@ -114,7 +114,7 @@ wheels = [
 ]
 
 [[package]]
-name = "masterblog-full-stack"
+name = "masterblog-api"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
