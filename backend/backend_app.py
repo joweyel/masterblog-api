@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 from typing import TypedDict
 
@@ -23,8 +23,13 @@ def get_next_id(posts: list[Post]) -> int:
     return max((post["id"] for post in posts), default=0) + 1
 
 
+def get_post_by_id(posts: list[Post], id: int) -> Post | None:
+    """Get post with the specified post id."""
+    return next((post for post in posts if post["id"] == id), None)
+
+
 @app.route("/api/posts", methods=['GET', "POST"])
-def get_posts():
+def get_posts() -> tuple[Response, int] | Response:
     if request.method == "POST":
         request_data: dict = request.get_json()
         title: str | None = request_data.get("title")
@@ -51,6 +56,20 @@ def get_posts():
             }), 400
 
     return jsonify(POSTS)
+
+
+@app.route("/api/posts/<int:id>", methods=['DELETE'])
+def delete_post(id: int) -> tuple[Response, int]:
+    post: Post | None = get_post_by_id(POSTS, id)
+    if post is None:
+        return jsonify({
+            "error": f"Post with id '{id}' not found"
+        }), 404
+
+    POSTS.remove(post)
+    return jsonify({
+        "message": f"Post with id '{id}' has been deleted successfully."
+    }), 200
 
 
 if __name__ == "__main__":
