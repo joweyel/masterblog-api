@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
-from typing import TypedDict
+from typing import TypedDict, Literal
 
 
 class Post(TypedDict):
@@ -54,8 +54,28 @@ def get_posts() -> tuple[Response, int] | Response:
                 "error": f"Missing required fields",
                 "missing": missing,
             }), 400
+    ################################
+    # Adding Sorting Functionality #
+    ################################
+    # Get the parameters
+    sort: str | None = request.args.get("sort")
+    direction: str | None = request.args.get("direction")
 
-    return jsonify(POSTS)
+    # Check parameters for validity
+    if sort and sort not in ("title", "content"):
+        return jsonify({"error": f"Invalid sort field: {sort}"}), 400
+    if direction and direction not in ("asc", "desc"):
+        return jsonify({"error": f"Invalid direction: {direction}"}), 400
+
+    sorted_posts: list[Post] = POSTS
+    if sort:
+        sorted_posts = sorted(
+            sorted_posts,
+            key=lambda post: post[sort].lower(),
+            reverse=(direction == "desc")  # reverse=False -> asc | reverse=True -> desc
+        )
+
+    return jsonify(sorted_posts)
 
 
 @app.route("/api/posts/<int:id>", methods=["DELETE"])
