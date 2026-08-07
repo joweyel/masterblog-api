@@ -28,7 +28,7 @@ def get_post_by_id(posts: list[Post], id: int) -> Post | None:
     return next((post for post in posts if post["id"] == id), None)
 
 
-@app.route("/api/posts", methods=['GET', "POST"])
+@app.route("/api/posts", methods=["GET", "POST"])
 def get_posts() -> tuple[Response, int] | Response:
     if request.method == "POST":
         request_data: dict = request.get_json()
@@ -58,7 +58,7 @@ def get_posts() -> tuple[Response, int] | Response:
     return jsonify(POSTS)
 
 
-@app.route("/api/posts/<int:id>", methods=['DELETE'])
+@app.route("/api/posts/<int:id>", methods=["DELETE"])
 def delete_post(id: int) -> tuple[Response, int]:
     post: Post | None = get_post_by_id(POSTS, id)
     if post is None:
@@ -70,6 +70,34 @@ def delete_post(id: int) -> tuple[Response, int]:
     return jsonify({
         "message": f"Post with id '{id}' has been deleted successfully."
     }), 200
+
+
+@app.route("/api/posts/<int:id>", methods=["PUT"])
+def update_post(id: int) -> tuple[Response, int]:
+    post: Post | None = get_post_by_id(POSTS, id)
+    if post is None:
+        return jsonify({
+            "error": f"Post with id '{id}' not found"
+        }), 404
+    data = request.get_json(silent=True) or {}
+    post["title"] = data.get("title", post["title"])
+    post["content"] = data.get("content", post["content"])
+
+    return jsonify(post), 200
+
+
+@app.route("/api/posts/search", methods=["GET"])
+def search_post() -> Response:
+    """Search posts based on title and content."""
+    title_query: str | None = request.args.get("title")
+    content_query: str | None = request.args.get("content")
+
+    results: list[Post] = [
+        post for post in POSTS
+        if (title_query and title_query.lower() in post["title"].lower())
+           or (content_query and content_query.lower() in post["content"].lower())
+    ]
+    return jsonify(results)
 
 
 if __name__ == "__main__":
