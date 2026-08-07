@@ -30,10 +30,7 @@
             "name": "sort",
             "in": "query",
             "type": "string",
-            "enum": [
-              "title",
-              "content"
-            ],
+            "enum": ["title", "content", "author", "date"],
             "required": false,
             "description": "Field to sort posts by"
           },
@@ -41,10 +38,7 @@
             "name": "direction",
             "in": "query",
             "type": "string",
-            "enum": [
-              "asc",
-              "desc"
-            ],
+            "enum": ["asc", "desc"],
             "required": false,
             "description": "Sort order"
           }
@@ -76,17 +70,12 @@
             "required": true,
             "schema": {
               "type": "object",
-              "required": [
-                "title",
-                "content"
-              ],
+              "required": ["title", "content", "author", "date"],
               "properties": {
-                "title": {
-                  "type": "string"
-                },
-                "content": {
-                  "type": "string"
-                }
+                "title": { "type": "string" },
+                "content": { "type": "string" },
+                "author": { "type": "string" },
+                "date": { "type": "string", "format": "date", "example": "2023-06-07" }
               }
             }
           }
@@ -154,12 +143,10 @@
             "schema": {
               "type": "object",
               "properties": {
-                "title": {
-                  "type": "string"
-                },
-                "content": {
-                  "type": "string"
-                }
+                "title": { "type": "string" },
+                "content": { "type": "string" },
+                "author": { "type": "string" },
+                "date": { "type": "string", "format": "date", "example": "2023-06-07" }
               }
             }
           }
@@ -176,7 +163,7 @@
     },
     "/api/posts/search": {
       "get": {
-        "summary": "Searches posts by title and/or content",
+        "summary": "Searches posts by title, content, author, and/or date",
         "produces": [
           "application/json"
         ],
@@ -197,6 +184,20 @@
             "type": "string",
             "required": false,
             "description": "Search term to match against the post content"
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "description": "Search term to match against the post author"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "type": "string",
+            "required": false,
+            "description": "Search term to match against the post date"
           }
         ],
         "responses": {

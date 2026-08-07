@@ -2,12 +2,15 @@ from flask import Flask, jsonify, request, Response, Blueprint
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_cors import CORS
 from typing import TypedDict, Literal
+from datetime import datetime
 
 
 class Post(TypedDict):
     id: int
     title: str
     content: str
+    author: str
+    date: str
 
 
 app = Flask(__name__)
@@ -27,8 +30,20 @@ swagger_ui_blueprint: Blueprint = get_swaggerui_blueprint(
 app.register_blueprint(swagger_ui_blueprint, url_prefix=SWAGGER_URL)
 
 POSTS: list[Post] = [
-    {"id": 1, "title": "First post", "content": "This is the first post.", },
-    {"id": 2, "title": "Second post", "content": "This is the second post.", },
+    {
+        "id": 1,
+        "title": "First post",
+        "content": "This is the first post.",
+        "author": "Your Name",
+        "date": "2023-06-07",
+    },
+    {
+        "id": 2,
+        "title": "Second post",
+        "content": "This is the second post.",
+        "author": "Your Name",
+        "date": "2023-06-08"
+    },
 ]
 
 
@@ -44,11 +59,13 @@ def get_post_by_id(posts: list[Post], id: int) -> Post | None:
 
 @app.route("/api/posts", methods=["GET", "POST"])
 def get_posts() -> tuple[Response, int] | Response:
-    """List all posts, or create a new one.
+    """List all posts (GET), or create a new one (POST).
 
     GET: returns all posts, optionally sorted via the `sort`
-    (`title`/`content`) and `direction` (`asc`/`desc`) query parameters.
-    POST: creates a new post from a JSON body with `title` and `content`.
+    (`title`/`content`/`author`/`date`) and `direction` (`asc`/`desc`)
+    query parameters.
+    POST: creates a new post from a JSON body with `title`, `content`,
+    `author`, and `date`.
 
     Returns
     -------
@@ -56,32 +73,28 @@ def get_posts() -> tuple[Response, int] | Response:
         On GET: the (optionally sorted) list of posts, or a 400 error
         if `sort`/`direction` are invalid.
         On POST: the created post with status 201, or a 400 error if
-        `title`/`content` are missing.
+        `title`/`content`/`author`/`date` are missing.
     """
     if request.method == "POST":
         request_data: dict = request.get_json()
         title: str | None = request_data.get("title")
         content: str | None = request_data.get("content")
+        author: str | None = request_data.get("author")
+        date: str | None = request_data.get("date")
 
-        if title and content:
-            new_id: int = get_next_id(posts=POSTS)
-            new_post: Post = {
-                "id": new_id,
-                "title": title,
-                "content": content,
-            }
-            POSTS.append(new_post)
-            return jsonify(new_post), 201
-        else:
-            missing: list[str] = []
-            if not title:
-                missing.append("title")
-            if not content:
-                missing.append("content")
+        fields: dict[str, str | None] = {"title": title, "content": content, "author": author, "date": date}
+        missing: list[str] = [name for name, value in fields.items() if not value]
+
+        # If any attribute is missing -> json with error message
+        if missing:
             return jsonify({
-                "error": f"Missing required fields",
+                "error": "Missing required fields",
                 "missing": missing,
             }), 400
+        new_post: Post = {"id": get_next_id(posts=POSTS), **fields}
+        POSTS.append(new_post)
+        return jsonify(new_post), 201
+
     ################################
     # Adding Sorting Functionality #
     ################################
@@ -89,18 +102,23 @@ def get_posts() -> tuple[Response, int] | Response:
     sort: str | None = request.args.get("sort")
     direction: str | None = request.args.get("direction")
 
-    # Check parameters for validity
-    if sort and sort not in ("title", "content"):
+    # Check parameters for validity (dynamically gets all searchable parameters from `Post` class)
+    sortable_fields: tuple[str, ...] = tuple(field for field in Post.__annotations__ if field != "id")
+    if sort and sort not in sortable_fields:
         return jsonify({"error": f"Invalid sort field: {sort}"}), 400
     if direction and direction not in ("asc", "desc"):
         return jsonify({"error": f"Invalid direction: {direction}"}), 400
 
     sorted_posts: list[Post] = POSTS
     if sort:
+        if sort == "date":
+            key = lambda post: datetime.strptime(post["date"], "%Y-%m-%d")
+        else:
+            key = lambda post: post[sort].lower()
         sorted_posts = sorted(
             sorted_posts,
-            key=lambda post: post[sort].lower(),
-            reverse=(direction == "desc")  # reverse=False -> asc | reverse=True -> desc
+            key=key,
+            reverse=(direction == "desc"),
         )
 
     return jsonify(sorted_posts)
@@ -135,7 +153,7 @@ def delete_post(id: int) -> tuple[Response, int]:
 
 @app.route("/api/posts/<int:id>", methods=["PUT"])
 def update_post(id: int) -> tuple[Response, int]:
-    """Update the title and/or content of the post with the given id.
+    """Update the title, content, author, and/or date of the post with the given id.
 
     Fields omitted from the JSON body keep their current value.
 
@@ -158,30 +176,33 @@ def update_post(id: int) -> tuple[Response, int]:
     data = request.get_json(silent=True) or {}
     post["title"] = data.get("title", post["title"])
     post["content"] = data.get("content", post["content"])
+    post["author"] = data.get("author", post["author"])
+    post["date"] = data.get("date", post["date"])
 
     return jsonify(post), 200
 
 
 @app.route("/api/posts/search", methods=["GET"])
 def search_post() -> Response:
-    """Search posts by title and/or content.
+    """Search posts by any field defined on `Post` (except `id`).
 
-    A post matches if the `title` query param is contained in its
-    title, or the `content` query param is contained in its content
-    (case-insensitive). Missing query params are not required to match.
+    A post matches if any provided query param is contained
+    (case-insensitive) in the corresponding post field.
 
     Returns
     -------
     Response
         The list of matching posts, or an empty list if none match.
     """
-    title_query: str | None = request.args.get("title")
-    content_query: str | None = request.args.get("content")
 
+    # Obtaining the `queries` to search for dynamically based on the attributes of the `Post` class
+    searchable_fields: tuple[str, ...] = tuple(field for field in Post.__annotations__ if field != "id")
+    queries: dict[str, str | None] = {field: request.args.get(field) for field in searchable_fields}
+
+    # Check if there is a match for any of the specified fields (generalized version)
     results: list[Post] = [
         post for post in POSTS
-        if (title_query and title_query.lower() in post["title"].lower())
-           or (content_query and content_query.lower() in post["content"].lower())
+        if any(value_query and value_query.lower() in post[field].lower() for field, value_query in queries.items())
     ]
     return jsonify(results)
 
