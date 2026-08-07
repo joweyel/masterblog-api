@@ -4,11 +4,9 @@
     "title": "Masterblog API",
     "version": "1.0.0"
   },
-  "servers": [
-    {
-      "url": "http://localhost:5001"
-    }
-  ],
+  "host": "localhost:5002",
+  "basePath": "/",
+  "schemes": ["http"],
   "tags": [
     {
       "name": "Post",
