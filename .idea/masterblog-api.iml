@@ -4,9 +4,11 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="~/Filen/Lernzeug/MSIT/AI for Developers/Term 1 - Jul 7 - Aug 16/4 - Back-end Development/Week 3 - More Server-Side Practice/masterblog-api/.venv" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings" />
+  <component name="PyDocumentationSettings" />
   <component name="ReSTService" />
+  <component name="TestRunnerService" />
 </module>
