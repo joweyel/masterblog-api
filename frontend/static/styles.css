@@ -26,7 +26,8 @@ body {
 }
 
 .input-field input,
-.input-field button {
+.input-field button,
+.input-grid input {
     height: 40px;
     padding: 10px;
     font-size: 16px;
@@ -41,8 +42,22 @@ body {
     margin-right: 10px;
 }
 
-.input-field input::placeholder {
+.input-field input::placeholder,
+.input-grid input::placeholder {
     color: #aaa;
+}
+
+.input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 500px) {
+    .input-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .input-field button {
@@ -72,6 +87,11 @@ body {
 .post p {
     margin: 10px 0 0;
     color: #333;
+}
+
+.post .post-meta {
+    font-size: 13px;
+    color: #aaa;
 }
 
 .post button {
