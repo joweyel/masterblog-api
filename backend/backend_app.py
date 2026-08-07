@@ -1,17 +1,11 @@
+import json
+
 from flask import Flask, jsonify, request, Response, Blueprint
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_cors import CORS
-from typing import TypedDict, Literal
 from datetime import datetime
 
-
-class Post(TypedDict):
-    id: int
-    title: str
-    content: str
-    author: str
-    date: str
-
+from utils import Post, get_next_id, get_post_by_id, load_posts, save_posts
 
 app = Flask(__name__)
 CORS(app)  # This will enable CORS for all routes
@@ -29,33 +23,22 @@ swagger_ui_blueprint: Blueprint = get_swaggerui_blueprint(
 )
 app.register_blueprint(swagger_ui_blueprint, url_prefix=SWAGGER_URL)
 
-POSTS: list[Post] = [
-    {
-        "id": 1,
-        "title": "First post",
-        "content": "This is the first post.",
-        "author": "Your Name",
-        "date": "2023-06-07",
-    },
-    {
-        "id": 2,
-        "title": "Second post",
-        "content": "This is the second post.",
-        "author": "Your Name",
-        "date": "2023-06-08"
-    },
-]
-
-
-def get_next_id(posts: list[Post]) -> int:
-    """Get next id for a post to add to post list."""
-    return max((post["id"] for post in posts), default=0) + 1
-
-
-def get_post_by_id(posts: list[Post], id: int) -> Post | None:
-    """Get post with the specified post id."""
-    return next((post for post in posts if post["id"] == id), None)
-
+# POSTS: list[Post] = [
+#     {
+#         "id": 1,
+#         "title": "First post",
+#         "content": "This is the first post.",
+#         "author": "Your Name",
+#         "date": "2023-06-07",
+#     },
+#     {
+#         "id": 2,
+#         "title": "Second post",
+#         "content": "This is the second post.",
+#         "author": "Your Name",
+#         "date": "2023-06-08"
+#     },
+# ]
 
 @app.route("/api/posts", methods=["GET", "POST"])
 def get_posts() -> tuple[Response, int] | Response:
@@ -91,8 +74,10 @@ def get_posts() -> tuple[Response, int] | Response:
                 "error": "Missing required fields",
                 "missing": missing,
             }), 400
-        new_post: Post = {"id": get_next_id(posts=POSTS), **fields}
-        POSTS.append(new_post)
+        posts: list[Post] = load_posts()
+        new_post: Post = {"id": get_next_id(posts=posts), **fields}
+        posts.append(new_post)
+        save_posts(posts)
         return jsonify(new_post), 201
 
     ################################
@@ -109,11 +94,11 @@ def get_posts() -> tuple[Response, int] | Response:
     if direction and direction not in ("asc", "desc"):
         return jsonify({"error": f"Invalid direction: {direction}"}), 400
 
-    sorted_posts: list[Post] = POSTS
+    sorted_posts: list[Post] = load_posts()
     if sort:
-        if sort == "date":
+        if sort == "date":  # sort by date
             key = lambda post: datetime.strptime(post["date"], "%Y-%m-%d")
-        else:
+        else:  # Normal lexicographical sort
             key = lambda post: post[sort].lower()
         sorted_posts = sorted(
             sorted_posts,
@@ -139,13 +124,15 @@ def delete_post(id: int) -> tuple[Response, int]:
         A confirmation message with status 200, or a 404 error if no
         post with the given id exists.
     """
-    post: Post | None = get_post_by_id(POSTS, id)
+    posts: list[Post] = load_posts()
+    post: Post | None = get_post_by_id(posts, id)
     if post is None:
         return jsonify({
             "error": f"Post with id '{id}' not found"
         }), 404
 
-    POSTS.remove(post)
+    posts.remove(post)
+    save_posts(posts)
     return jsonify({
         "message": f"Post with id '{id}' has been deleted successfully."
     }), 200
@@ -168,7 +155,8 @@ def update_post(id: int) -> tuple[Response, int]:
         The updated post with status 200, or a 404 error if no post
         with the given id exists.
     """
-    post: Post | None = get_post_by_id(POSTS, id)
+    posts: list[Post] = load_posts()
+    post: Post | None = get_post_by_id(posts, id)
     if post is None:
         return jsonify({
             "error": f"Post with id '{id}' not found"
@@ -178,6 +166,7 @@ def update_post(id: int) -> tuple[Response, int]:
     post["content"] = data.get("content", post["content"])
     post["author"] = data.get("author", post["author"])
     post["date"] = data.get("date", post["date"])
+    save_posts(posts)
 
     return jsonify(post), 200
 
@@ -200,11 +189,30 @@ def search_post() -> Response:
     queries: dict[str, str | None] = {field: request.args.get(field) for field in searchable_fields}
 
     # Check if there is a match for any of the specified fields (generalized version)
+    posts: list[Post] = load_posts()
     results: list[Post] = [
-        post for post in POSTS
+        post for post in posts
         if any(value_query and value_query.lower() in post[field].lower() for field, value_query in queries.items())
     ]
     return jsonify(results)
+
+
+@app.errorhandler(json.JSONDecodeError)
+def handle_corrupted_posts_file(error: json.JSONDecodeError) -> tuple[Response, int]:
+    return jsonify({
+        "error": "Posts file is corrupted",
+        "message": error.msg,
+    }), 500
+
+
+@app.errorhandler(404)
+def not_found_error(error) -> tuple[Response, int]:
+    return jsonify({"error": "Not Found"}), 404
+
+
+@app.errorhandler(500)
+def internal_server_error(error) -> tuple[Response, int]:
+    return jsonify({"error": "Internal Server Error"}), 500
 
 
 if __name__ == "__main__":
