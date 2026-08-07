@@ -1,4 +1,5 @@
 import json
+import os
 from typing import TypedDict
 
 class Post(TypedDict):
@@ -9,7 +10,7 @@ class Post(TypedDict):
     date: str
 
 
-POSTS_FILE_PATH: str = "posts.json"
+POSTS_FILE_PATH: str = os.path.join(os.path.dirname(__file__), "posts.json")
 
 
 def get_next_id(posts: list[Post]) -> int:
