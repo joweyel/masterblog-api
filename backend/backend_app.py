@@ -1,19 +1,57 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+from typing import TypedDict
+
+
+class Post(TypedDict):
+    id: int
+    title: str
+    content: str
+
 
 app = Flask(__name__)
 CORS(app)  # This will enable CORS for all routes
 
-POSTS = [
-    {"id": 1, "title": "First post", "content": "This is the first post."},
-    {"id": 2, "title": "Second post", "content": "This is the second post."},
+POSTS: list[Post] = [
+    {"id": 1, "title": "First post", "content": "This is the first post.", },
+    {"id": 2, "title": "Second post", "content": "This is the second post.", },
 ]
 
 
-@app.route('/api/posts', methods=['GET'])
+def get_next_id(posts: list[Post]) -> int:
+    """Get next id for a post to add to post list."""
+    return max((post["id"] for post in posts), default=0) + 1
+
+
+@app.route("/api/posts", methods=['GET', "POST"])
 def get_posts():
+    if request.method == "POST":
+        request_data: dict = request.get_json()
+        title: str | None = request_data.get("title")
+        content: str | None = request_data.get("content")
+
+        if title and content:
+            new_id: int = get_next_id(posts=POSTS)
+            new_post: Post = {
+                "id": new_id,
+                "title": title,
+                "content": content,
+            }
+            POSTS.append(new_post)
+            return jsonify(new_post), 201
+        else:
+            missing: list[str] = []
+            if not title:
+                missing.append("title")
+            if not content:
+                missing.append("content")
+            return jsonify({
+                "error": f"Missing required fields",
+                "missing": missing,
+            }), 400
+
     return jsonify(POSTS)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5002, debug=True)
